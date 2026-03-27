@@ -1,0 +1,42 @@
+# Environment & secrets
+.env
+*.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Data files (store in Delta Lake, not Git)
+data/
+*.parquet
+*.csv
+*.json
+!tests/fixtures/*.json
+
+# MLflow
+mlruns/
+mlflow/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
+
+# Docker
+*.log
