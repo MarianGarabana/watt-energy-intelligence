@@ -1,4 +1,20 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "2"
+# dependencies = [
+#   "python-dotenv",
+#   "requests",
+#   "pandas",
+#   "xgboost",
+#   "lightgbm",
+#   "scikit-learn",
+#   "mlflow",
+#   "evidently",
+#   "shap",
+#   "optuna",
+# ]
+# ///
 # MAGIC %md
 # MAGIC # 🥉 Bronze Layer — Raw Data Ingestion
 # MAGIC
@@ -17,6 +33,7 @@
 # MAGIC **Run this notebook daily via a Databricks Job.**
 
 # COMMAND ----------
+
 # MAGIC %md ## 0. Setup & Configuration
 
 # COMMAND ----------
@@ -50,15 +67,16 @@ print(f"Spark version : {spark.version}")
 print(f"Run timestamp : {datetime.now(timezone.utc).isoformat()}")
 
 # COMMAND ----------
+
 # MAGIC %md ## 1. Configuration — Edit These
 
 # COMMAND ----------
 
 # ── API Keys (use Databricks Secrets in production) ──────────────────────────
 # In Databricks: dbutils.secrets.get(scope="watt", key="eia_api_key")
-EIA_API_KEY   = dbutils.secrets.get(scope="watt", key="eia_api_key")   # or hardcode for testing
-ENTSO_API_KEY = dbutils.secrets.get(scope="watt", key="entso_api_key") # or None to skip ENTSO
 
+EIA_API_KEY   = "00aBsSmN4Zgw8lzttWIN8J2yBwAiiZfEUL0Hr6sy"
+ENTSO_API_KEY = None   # skip ENTSO for now
 # ── Regions to ingest ─────────────────────────────────────────────────────────
 EIA_REGIONS   = ["CAL", "TEX", "NY", "NE", "MIDW", "NW"]
 ENTSO_COUNTRIES = ["DE", "FR", "ES"]   # set to [] to skip ENTSO on Day 1
@@ -71,6 +89,7 @@ CATALOG = "watt"
 SCHEMA  = "bronze"
 
 # COMMAND ----------
+
 # MAGIC %md ## 2. Create Catalog & Schema
 
 # COMMAND ----------
@@ -81,7 +100,24 @@ spark.sql(f"USE {CATALOG}.{SCHEMA}")
 print(f"✓ Using catalog: {CATALOG}.{SCHEMA}")
 
 # COMMAND ----------
+
 # MAGIC %md ## 3. Ingest EIA Demand Data
+
+# COMMAND ----------
+
+# Fix: patch EIA date format (remove trailing Z that breaks the API)
+import types
+from datetime import datetime, timedelta, timezone
+from ingestion import eia_client
+
+def _fixed_date_range(self, days_back):
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=days_back)
+    fmt = "%Y-%m-%dT%H"   # no Z
+    return start.strftime(fmt), end.strftime(fmt)
+
+eia_client.EIAClient._date_range = _fixed_date_range
+print("✓ Date format patched")
 
 # COMMAND ----------
 
@@ -105,6 +141,7 @@ print(f"EIA Demand — rows: {spark_demand.count():,}")
 spark_demand.show(5, truncate=False)
 
 # COMMAND ----------
+
 # MAGIC %md ### Write Demand to Bronze Delta Table (merge/upsert to avoid duplicates)
 
 # COMMAND ----------
@@ -131,6 +168,7 @@ else:
 spark.sql(f"SELECT COUNT(*) as total_rows FROM {demand_table}").show()
 
 # COMMAND ----------
+
 # MAGIC %md ## 4. Ingest EIA Generation Mix
 
 # COMMAND ----------
@@ -171,7 +209,46 @@ spark.sql(f"""
 """).show()
 
 # COMMAND ----------
+
 # MAGIC %md ## 5. Ingest Weather Data
+
+# COMMAND ----------
+
+# Fix: patch weather client — remove conflicting forecast_days param
+import types
+from ingestion import weather_client as wc
+from datetime import datetime, timedelta, timezone
+
+def _fixed_get_weather(self, region="CAL", days_back=30, days_forward=2, lat=None, lon=None):
+    if lat is None or lon is None:
+        if region not in wc.REGION_COORDS:
+            raise ValueError(f"Unknown region '{region}'")
+        lat, lon = wc.REGION_COORDS[region]
+
+    now = datetime.now(timezone.utc)
+    start_date = (now - timedelta(days=days_back)).strftime("%Y-%m-%d")
+    end_date   = (now + timedelta(days=days_forward)).strftime("%Y-%m-%d")
+
+    import requests, pandas as pd
+    params = {
+        "latitude":  lat,
+        "longitude": lon,
+        "start_date": start_date,
+        "end_date":   end_date,      # use date range only — no forecast_days
+        "hourly":    ",".join(wc.HOURLY_VARIABLES),
+        "timezone":  "UTC",
+    }
+    r = requests.get(wc.FORECAST_URL, params=params, timeout=30)
+    r.raise_for_status()
+    df = self._parse_response(r.json(), region)
+    if df.empty or "timestamp" not in df.columns:
+        return pd.DataFrame()
+    df = df.drop_duplicates(subset=["timestamp","region"]).sort_values("timestamp").reset_index(drop=True)
+    print(f"✓ Weather {region}: {len(df)} rows ({start_date} → {end_date})")
+    return df
+
+wc.WeatherClient.get_weather = _fixed_get_weather
+print("✓ Weather client patched")
 
 # COMMAND ----------
 
@@ -209,6 +286,7 @@ else:
     print(f"✓ Merged into: {weather_table}")
 
 # COMMAND ----------
+
 # MAGIC %md ## 6. Ingest ENTSO-E European Load (optional)
 
 # COMMAND ----------
@@ -247,6 +325,7 @@ else:
     print("⏭ Skipping ENTSO-E (no API key or no countries configured)")
 
 # COMMAND ----------
+
 # MAGIC %md ## 7. Bronze Layer Summary
 
 # COMMAND ----------
@@ -274,3 +353,7 @@ for table in tables:
 
 print("\n✅ Bronze ingestion complete.")
 print(f"   Next step: Run notebook 02_silver_cleaning.py")
+
+# COMMAND ----------
+
+
