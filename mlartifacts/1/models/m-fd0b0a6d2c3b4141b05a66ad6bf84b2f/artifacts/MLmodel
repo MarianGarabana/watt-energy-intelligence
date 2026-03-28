@@ -1,0 +1,56 @@
+artifact_path: mlflow-artifacts:/1/models/m-fd0b0a6d2c3b4141b05a66ad6bf84b2f/artifacts
+flavors:
+  lightgbm:
+    code: null
+    data: model.pkl
+    lgb_version: 4.6.0
+    model_class: lightgbm.sklearn.LGBMRegressor
+    serialization_format: cloudpickle
+    skops_trusted_types: null
+  python_function:
+    data: model.pkl
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.lightgbm
+    python_version: 3.13.5
+is_signature_from_type_hint: false
+mlflow_version: 3.10.0
+model_id: m-fd0b0a6d2c3b4141b05a66ad6bf84b2f
+model_size_bytes: 1314624
+model_uuid: m-fd0b0a6d2c3b4141b05a66ad6bf84b2f
+prompts: null
+run_id: 71e6b43ed3504ab2a12da641cb6d1246
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "double", "name": "demand_lag_1h", "required": true}, {"type":
+    "double", "name": "demand_lag_24h", "required": true}, {"type": "double", "name":
+    "demand_lag_168h", "required": true}, {"type": "double", "name": "renewable_lag_24h",
+    "required": true}, {"type": "double", "name": "demand_roll_mean_24h", "required":
+    true}, {"type": "double", "name": "demand_roll_std_24h", "required": true}, {"type":
+    "double", "name": "demand_roll_mean_168h", "required": true}, {"type": "double",
+    "name": "demand_roll_max_24h", "required": true}, {"type": "long", "name": "hour_of_day",
+    "required": true}, {"type": "long", "name": "day_of_week", "required": true},
+    {"type": "long", "name": "month_of_year", "required": true}, {"type": "long",
+    "name": "is_weekend", "required": true}, {"type": "long", "name": "is_peak_hour",
+    "required": true}, {"type": "double", "name": "hour_sin", "required": true}, {"type":
+    "double", "name": "hour_cos", "required": true}, {"type": "double", "name": "month_sin",
+    "required": true}, {"type": "double", "name": "month_cos", "required": true},
+    {"type": "double", "name": "temperature_2m", "required": true}, {"type": "double",
+    "name": "heating_degrees", "required": true}, {"type": "double", "name": "cooling_degrees",
+    "required": true}, {"type": "double", "name": "temp_x_hour", "required": true},
+    {"type": "double", "name": "wind_speed_10m", "required": true}, {"type": "double",
+    "name": "shortwave_radiation", "required": true}, {"type": "double", "name": "cloud_cover",
+    "required": true}, {"type": "double", "name": "precipitation", "required": true},
+    {"type": "double", "name": "relative_humidity_2m", "required": true}, {"type":
+    "double", "name": "renewable_pct", "required": true}, {"type": "double", "name":
+    "demand_vs_roll_mean", "required": true}, {"type": "double", "name": "wind_power_potential",
+    "required": true}, {"type": "double", "name": "effective_solar", "required": true}]'
+  outputs: '[{"type": "double", "required": true}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-03-28 20:39:38.929085'
