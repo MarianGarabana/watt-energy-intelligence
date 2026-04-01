@@ -22,7 +22,7 @@
 
 # MAGIC %md
 # MAGIC ## Section 1. Setup
-# MAGIC Note: xgboost, lightgbm, shap are pre-installed on Databricks serverless — no %pip install needed.
+# MAGIC xgboost, lightgbm, shap are pre-installed in Databricks serverless environment v2.
 
 # COMMAND ----------
 
@@ -46,7 +46,6 @@ warnings.filterwarnings('ignore')
 sns.set_theme(style='whitegrid', palette='muted', font_scale=1.1)
 
 # Fixed seed — same as every IE class project
-EXP_NAME = '/Users/marian.garabana@student.ie.edu/watt-demand-forecaster'
 RANDOM_STATE = 42
 
 CATALOG  = 'watt'
@@ -59,8 +58,7 @@ mlflow.set_registry_uri("databricks-uc")
 mlflow.set_experiment(EXP_NAME)
 
 print(f'MLflow experiment : {EXP_NAME}')
-gold_spark = spark.read.table(f'{GOLD}.ml_features').orderBy('timestamp')
-
+print(f'Reading from      : {GOLD}.ml_features')
 
 # COMMAND ----------
 
