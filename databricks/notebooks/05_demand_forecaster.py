@@ -17,12 +17,9 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install xgboost lightgbm shap --quiet
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## Section 1. Setup
+# MAGIC Note: xgboost, lightgbm, shap are pre-installed on Databricks serverless — no %pip install needed.
 
 # COMMAND ----------
 
@@ -51,9 +48,9 @@ RANDOM_STATE = 42
 CATALOG  = 'watt'
 GOLD     = f'{CATALOG}.gold'
 TARGET   = 'demand_mwh'
-EXP_NAME = 'watt-demand-forecaster'
+EXP_NAME = '/Users/marian.garabana@gmail.com/watt-demand-forecaster'
 
-# In Databricks, MLflow tracking is built-in — no need to set a tracking URI
+# In Databricks, MLflow tracking is built-in — full path required for serverless
 mlflow.set_experiment(EXP_NAME)
 
 print(f'MLflow experiment : {EXP_NAME}')
@@ -67,7 +64,9 @@ print(f'Reading from      : {GOLD}.ml_features')
 # COMMAND ----------
 
 # Read Gold Delta table → pandas (same toPandas() pattern from MDA notebooks)
-gold_spark = spark.read.table(f'{GOLD}.ml_features')
+# Sort by timestamp before converting — Delta tables have no guaranteed row order,
+# and split_df(shuffle=False) depends on chronological order being preserved.
+gold_spark = spark.read.table(f'{GOLD}.ml_features').orderBy('timestamp')
 df = gold_spark.toPandas()
 
 print(f'Shape: {df.shape[0]:,} rows × {df.shape[1]} columns')
