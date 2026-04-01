@@ -1,5 +1,8 @@
 # Databricks notebook source
-
+# /// script
+# [tool.databricks.environment]
+# environment_version = "2"
+# ///
 # MAGIC %md
 # MAGIC # ⚡ WATT — Demand Forecaster (Production)
 # MAGIC
@@ -26,7 +29,7 @@
 import warnings
 import time
 
-import pandas as pd
+import pandas as pd  # Updated pandas version or check for compatibility
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -43,18 +46,21 @@ warnings.filterwarnings('ignore')
 sns.set_theme(style='whitegrid', palette='muted', font_scale=1.1)
 
 # Fixed seed — same as every IE class project
+EXP_NAME = '/Users/marian.garabana@student.ie.edu/watt-demand-forecaster'
 RANDOM_STATE = 42
 
 CATALOG  = 'watt'
 GOLD     = f'{CATALOG}.gold'
 TARGET   = 'demand_mwh'
-EXP_NAME = '/Users/marian.garabana@gmail.com/watt-demand-forecaster'
+EXP_NAME = '/Users/marian.garabana@student.ie.edu/watt-demand-forecaster'
 
 # In Databricks, MLflow tracking is built-in — full path required for serverless
+mlflow.set_registry_uri("databricks-uc")
 mlflow.set_experiment(EXP_NAME)
 
 print(f'MLflow experiment : {EXP_NAME}')
-print(f'Reading from      : {GOLD}.ml_features')
+gold_spark = spark.read.table(f'{GOLD}.ml_features').orderBy('timestamp')
+
 
 # COMMAND ----------
 
@@ -260,10 +266,10 @@ with mlflow.start_run(run_name='xgboost_gridsearch') as run:
 
     # Log model — same mlflow.xgboost.log_model() pattern
     mlflow.xgboost.log_model(
-        grid_xgb.best_estimator_,
-        name          = 'xgboost_demand_forecaster',
-        input_example = X_test.iloc[:5]
-    )
+    grid_xgb.best_estimator_,
+    artifact_path = 'xgboost_demand_forecaster',
+    input_example = X_test.iloc[:5])
+
 
     xgb_run_id = run.info.run_id
     print(f'\n✓ XGBoost run logged: {xgb_run_id}')
@@ -327,10 +333,10 @@ with mlflow.start_run(run_name='lightgbm_gridsearch') as run:
     mlflow.set_tag('stage',   'production')
 
     mlflow.lightgbm.log_model(
-        grid_lgb.best_estimator_,
-        name          = 'lgb_demand_forecaster',
-        input_example = X_test.iloc[:5]
-    )
+    grid_lgb.best_estimator_,
+    artifact_path = 'lgb_demand_forecaster',
+    input_example = X_test.iloc[:5])
+
 
     lgb_run_id = run.info.run_id
     print(f'\n✓ LightGBM run logged: {lgb_run_id}')
@@ -339,6 +345,12 @@ with mlflow.start_run(run_name='lightgbm_gridsearch') as run:
 
 # MAGIC %md
 # MAGIC ## Section 9. Pick Winner & Register in Model Registry
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC CREATE SCHEMA IF NOT EXISTS watt.models
+# MAGIC
 
 # COMMAND ----------
 
@@ -359,12 +371,16 @@ if xgb_mae <= lgb_mae:
 else:
     winner_name, winner_grid, winner_run_id, winner_preds = 'LightGBM', grid_lgb, lgb_run_id, lgb_preds
 
-print(f'\n🏆 Winner: {winner_name}')
+print(f'\n Winner: {winner_name}')
 
-# Register in MLflow Model Registry — same as scenario-2 notebook
+# Model Registry requires s3:PutObject on UC storage — not available on Free Edition.
+# The model is already fully saved in the MLflow run artifact (log_model above).
+# To load it later: mlflow.xgboost.load_model(f'runs:/{winner_run_id}/xgboost_demand_forecaster')
 model_uri = f'runs:/{winner_run_id}/{"xgboost" if winner_name == "XGBoost" else "lgb"}_demand_forecaster'
-registered = mlflow.register_model(model_uri=model_uri, name='watt-demand-forecaster')
-print(f'✓ Model registered: watt-demand-forecaster  version={registered.version}')
+print(f'  Model URI : {model_uri}')
+print(f'  XGBoost run  : {xgb_run_id}')
+print(f'  LightGBM run : {lgb_run_id}')
+
 
 # COMMAND ----------
 
@@ -444,6 +460,6 @@ print(f'  Test R²         : {max(xgb_r2, lgb_r2):.4f}')
 print(f'  Baseline MAE    : {baseline_mae:,.0f} MWh')
 print(f'  Improvement     : {(1 - min(xgb_mae, lgb_mae)/baseline_mae)*100:.1f}%')
 print(f'  MLflow exp      : {EXP_NAME}')
-print(f'  Registry        : watt-demand-forecaster  v{registered.version}')
+print(f'  Model URI       : {model_uri}')
 print()
 print('  Next step → 06_anomaly_and_renewable.py')
